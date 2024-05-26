@@ -1,0 +1,3 @@
+[submodule "account-management/submodules/account-management"]
+	path = account-management/submodules/account-management
+	url = https://github.com/maelynluraobs/nexusbank
