@@ -4,13 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use GuzzleHttp\Client;
-use GuzzleHttp\RequestOptions;
+use GuzzleHttp\Exception\RequestException;
 use App\Models\Account;
 use Illuminate\Support\Facades\Http;
 
 class AccountController extends Controller
 {
-    
     protected $client;
 
     public function __construct()
@@ -18,16 +17,17 @@ class AccountController extends Controller
         $this->client = new Client([
             'base_uri' => 'https://api.teller.io/',
             'verify' => true,
-            'cert' => 'C:\Users\crstn\OneDrive\Documents\New folder\certificate.pem',
-            'ssl_key' => 'C:\Users\crstn\OneDrive\Documents\New folder\private_key.pem',
+            'cert' => 'C:\Users\crstn\OneDrive\Documents\New folder/certificate.pem',
+            'ssl_key' => 'C:\Users\crstn\OneDrive\Documents\New folder/private_key.pem',
             'headers' => [
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . env('TELLER_API_KEY'),
+                'Authorization' => 'Bearer' . env('TELLER_API_KEY'),
+
             ],
         ]);
     }
 
-    public function fetchAccounts()
+    public function listAccounts()
     {
         try {
             $response = $this->client->get('accounts');
@@ -54,47 +54,10 @@ class AccountController extends Controller
                 Account::updateOrCreate(['account_id' => $accountData['account_id']], $accountData);
             }
 
-            return response()->json(['message' => 'Accounts fetched and stored successfully']);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json($accounts);
+        } catch (RequestException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->getCode());
         }
-    }
-
-    public function listAccounts()
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('TELLER_API_KEY'),
-        ])->get('https://api.teller.io/accounts');
-
-        if ($response->successful()) {
-            $accounts = $response->json();
-
-            $formattedAccounts = collect($accounts)->map(function ($account) {
-                return [
-                    'enrollment_id' => $account['enrollment_id'],
-                    'links' => [
-                        'balances' => $account['links']['balances'],
-                        'self' => $account['links']['self'],
-                        'transactions' => $account['links']['transactions'],
-                    ],
-                    'institution' => [
-                        'name' => $account['institution']['name'],
-                        'id' => $account['institution']['id'],
-                    ],
-                    'type' => $account['type'],
-                    'name' => $account['name'],
-                    'subtype' => $account['subtype'],
-                    'currency' => $account['currency'],
-                    'id' => $account['id'],
-                    'last_four' => $account['last_four'],
-                    'status' => $account['status'],
-                ];
-            });
-
-            return response()->json($formattedAccounts);
-        }
-
-        return response()->json(['error' => 'Failed to fetch accounts'], $response->status());
     }
 
     public function getAccount($accountId)
@@ -103,8 +66,8 @@ class AccountController extends Controller
             $response = $this->client->get("accounts/{$accountId}");
             $account = json_decode($response->getBody()->getContents(), true);
             return response()->json($account);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (RequestException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->getCode());
         }
     }
 
@@ -113,12 +76,11 @@ class AccountController extends Controller
         try {
             $response = $this->client->delete("accounts/{$accountId}");
             if ($response->getStatusCode() === 204) {
+                Account::where('account_id', $accountId)->delete();
                 return response()->json(['message' => 'Account deleted successfully']);
-            } else {
-                return response()->json(['error' => 'Failed to delete account'], $response->getStatusCode());
             }
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (RequestException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->getCode());
         }
     }
 
@@ -127,12 +89,11 @@ class AccountController extends Controller
         try {
             $response = $this->client->delete('accounts');
             if ($response->getStatusCode() === 204) {
+                Account::truncate();
                 return response()->json(['message' => 'All accounts deleted successfully']);
-            } else {
-                return response()->json(['error' => 'Failed to delete all accounts'], $response->getStatusCode());
             }
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        } catch (RequestException $e) {
+            return response()->json(['error' => $e->getMessage()], $e->getCode());
         }
     }
 }
